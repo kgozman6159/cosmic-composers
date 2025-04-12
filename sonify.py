@@ -1,148 +1,156 @@
+import mido
+from mido import Message, MidiFile, MidiTrack
 import numpy as np
-import pretty_midi
 from midi2audio import FluidSynth
-import os
-import sys
+import matplotlib.pyplot as plt
+from pydub import AudioSegment
 
-"""
-INPUTS: 
-- wavelengths array
-- intensities array
-- desired output path for .wav file
-- path for fluidsynth file (to make use of instruments)
+def sonify_spectrum_to_wav(
+    wavelength,
+    bg_noise,
+    emission,
+    absorption,
+    cosmic_rays,
+    midi_path="spectrum_sonification.mid",
+    wav_path="spectrum_sonification.wav",
+    soundfont_path="FluidR3_GM.sf2"
+):
+    # Normalize data
+    def normalize(arr, out_min, out_max):
+        arr_min, arr_max = min(arr), max(arr)
+        return [int(out_min + (x - arr_min) / (arr_max - arr_min) * (out_max - out_min)) if arr_max != arr_min else out_min for x in arr]
 
-OUTPUT:
-- returns nothing
-- generates .wav file (path is printed in terminal)
+    # Initialize MIDI
+    mid = MidiFile()
+    tempo = 375000  # microseconds per beat (120 BPM)
 
-SETUP:
-- install dependencies in requirements.txt file
-- manually install fluidsynth
-    brew install fluidsynth (mac)
-    sudo apt-get install fluidsynth
-    (download separately for windows)
-- open folder to get FluidR3_GM.sf2 file
-- pass path to file as input
-"""
+    # Background noise track (pad instrument for ambient sound)
+    track_bg = MidiTrack()
+    mid.tracks.append(track_bg)
+    track_bg.append(mido.MetaMessage('set_tempo', tempo=tempo))
+    track_bg.append(Message('program_change', program=90, channel=0))  # Pad 3 (polysynth)
 
-def sonify_spectrum(wavelengths, intensities, wav_output_path="spectrum.wav", soundfont_path="FluidR3_GM.sf2"):
-    # Normalize intensities to [0, 1]
-    intensities = intensities / np.max(intensities)
+    # Emission track (bright instrument with longer note durations)
+    track_em = MidiTrack()
+    mid.tracks.append(track_em)
+    track_em.append(Message('program_change', program=73, channel=1))  # Choir (ambient-friendly)
 
-    # Map intensity to velocity (volume)
-    def intensity_to_velocity(i):
-        return int(np.interp(i, [0, 1], [30, 127]))  # Avoid velocity = 0
+    # Absorption track (synth pad instrument for deep, atmospheric sound)
+    track_ab = MidiTrack()
+    mid.tracks.append(track_ab)
+    track_ab.append(Message('program_change', program=92, channel=2))  # String or Synth pad
 
-    # Create PrettyMIDI object
-    pm = pretty_midi.PrettyMIDI()
+    # Cosmic ray track (soft percussion with delayed pings)
+    track_cosmic = MidiTrack()
+    mid.tracks.append(track_cosmic)
+    track_cosmic.append(Message('program_change', program=10, channel=3))  # Music Box
 
-    # Create instruments for different intensity levels
-    instruments = {
-        'bells': pretty_midi.Instrument(program=10),     # Glockenspiel for low intensities
-        'flute': pretty_midi.Instrument(program=73),     # Flute for moderate intensities
-        'violin': pretty_midi.Instrument(program=40),    # Violin for moderate-high intensities
-        'cello': pretty_midi.Instrument(program=42),     # Cello for high intensities
-        'bass': pretty_midi.Instrument(program=32),      # Bass for very high intensities
-    }
+    # Normalize values to MIDI pitch (21–108)
+    pitches_emission = normalize(emission, 50, 70)  # Emission (higher notes)
+    pitches_absorption = normalize(absorption, 28, 50)  # Absorption (lower notes)
+    velocities_bg = normalize(bg_noise, 40, 80)  # Background noise intensity
+    velocities_cosmic = normalize(cosmic_rays, 80, 127)  # Cosmic rays (higher velocity for impact)
 
-    # Function to choose instrument based on intensity
-    def choose_instrument(i):
-        if i < 0.2:
-            return instruments['bells']
-        elif i < 0.4:
-            return instruments['flute']
-        elif i < 0.6:
-            return instruments['violin']
-        elif i < 0.8:
-            return instruments['cello']
+    # Note duration for smoother sound (longer duration for overlapping sounds)
+    note_duration = 500  # 500ms (0.5 seconds)
+
+    # Apply pitch bends for smoother transitions
+    pitch_bend_range = 8191  # Maximum allowed pitch bend
+
+    for i in range(len(wavelength)):
+        time = i * 100  # space notes apart (still keeping some space for smoothness)
+
+        # Background sustained note (longer duration for ambient sound)
+        track_bg.append(Message('note_on', note=50, velocity=velocities_bg[i], time=0, channel=0))
+        track_bg.append(Message('note_off', note=50, velocity=0, time=note_duration, channel=0))
+
+        # Emission (longer notes and pitch bend applied)
+        track_em.append(Message('note_on', note=pitches_emission[i], velocity=70, time=0, channel=1))
+        track_em.append(Message('pitchwheel', pitch=pitch_bend_range, time=0, channel=1))  # Apply pitch bend for smooth transition
+        track_em.append(Message('note_off', note=pitches_emission[i], velocity=0, time=note_duration, channel=1))
+
+        # Absorption (longer notes with some pitch bend)
+        track_ab.append(Message('note_on', note=pitches_absorption[i], velocity=100, time=0, channel=2))
+        track_ab.append(Message('pitchwheel', pitch=pitch_bend_range, time=0, channel=2))  # Apply pitch bend for smooth transition
+        track_ab.append(Message('note_off', note=pitches_absorption[i], velocity=0, time=note_duration, channel=2))
+
+        if cosmic_rays[i] > 0.5:  # Only trigger a cosmic ray when intensity exceeds a threshold
+            # Adjust velocity for cosmic ray (make it softer)
+            velocity = velocities_cosmic[i] // 2  # Halve the velocity for a softer sound
+            note = 85  # Pick a pitch that sounds bright (like a bell or music box)
+            delay = i * 100  # Gradually space out cosmic ray events
+
+            track_cosmic.append(Message('note_on', note=note, velocity=velocity, time=delay, channel=3))  # Delay based on index
+            track_cosmic.append(Message('note_off', note=note, velocity=0, time=note_duration, channel=3))
         else:
-            return instruments['bass']
+            # No cosmic ray spike: Add silence
+            track_cosmic.append(Message('note_on', note=0, velocity=0, time=0, channel=3))  # Silence
+            track_cosmic.append(Message('note_off', note=0, velocity=0, time=note_duration, channel=3))  # Silence duration
+   
+    mid.save(midi_path)
 
-    # Time per note
-    note_duration = 0.2
-    current_time = 0.0
-
-    # Create notes based on intensity and wavelength
-    for w, i in zip(wavelengths, intensities):
-        pitch = int(np.interp(w, [min(wavelengths), max(wavelengths)], [40, 100]))
-        velocity = intensity_to_velocity(i)
-        instrument = choose_instrument(i)
-        note = pretty_midi.Note(
-            velocity=velocity,
-            pitch=pitch,
-            start=current_time,
-            end=current_time + note_duration
-        )
-        instrument.notes.append(note)
-        current_time += note_duration
-
-    # Add instruments to the MIDI object
-    for inst in instruments.values():
-        if inst.notes:  # only add instruments that have notes
-            pm.instruments.append(inst)
-
-    # Save MIDI file temporarily
-    midi_filename = "temp_spectrum.mid"
-    pm.write(midi_filename)
-
-    # Convert MIDI to WAV using FluidSynth
     fs = FluidSynth(soundfont_path)
-    fs.midi_to_audio(midi_filename, wav_output_path)
+    fs.midi_to_audio(midi_path, wav_path)
 
-    print(f"🎶 Sonification complete. WAV saved at: {wav_output_path}")
-
-
-"""
-INPUTS:
-- program number: number from 0-127 which maps to a MIDI instrument
-- soundfont_path: path to FluidR3_GM.sf2 file
-- out_dir: directory to store output
-
-OUTPUT:
-- returns nothing
-- creates .wav file of simple 5-note scale played with specified instrument
-- file stored in specified output directory
-"""
-def play_instrument(program_number, soundfont_path="FluidR3_GM.sf2", out_dir="preview"):
-    os.makedirs(out_dir, exist_ok=True)
-
-    if not (0 <= program_number <= 127):
-        raise ValueError("Instrument number must be between 0 and 127.")
-
-    # Create MIDI object
-    pm = pretty_midi.PrettyMIDI()
-    instrument = pretty_midi.Instrument(program=program_number)
-
-    # Simple 5-note scale (C D E F G)
-    start_time = 0.0
-    for i in range(5):
-        pitch = 60 + i  # C major scale starting at middle C
-        note = pretty_midi.Note(velocity=100, pitch=pitch, start=start_time, end=start_time + 0.5)
-        instrument.notes.append(note)
-        start_time += 0.5
-
-    pm.instruments.append(instrument)
-
-    # Save MIDI
-    midi_path = "temp_preview.mid"
-    pm.write(midi_path)
-
-    # WAV path
-    output_wav = os.path.join(out_dir, 'instr')
-    output_wav += str(program_number) + '.wav'
-
-    # Convert to WAV
-    fs = FluidSynth(soundfont_path)
-    fs.midi_to_audio(midi_path, output_wav)
-
-    print(f"✅ Instrument {program_number} preview saved to {output_wav}")
+    print(f"✅ Saved: {midi_path} and {wav_path}")
 
 
-# CODE TO SONIFY SPECTRUM
-# wavelengths = np.linspace(300, 900, 100)
-# intensities = np.random.rand(100) * 100
-# sonify_spectrum(wavelengths, intensities, "spectrum1.wav")
 
-# CODE TO GENERATE PREVIEWS for all 0-127 instruments
-# for i in range(128):
-#     play_instrument(i)
+def remove_trailing_silence_from_wav(wav_path, silence_threshold=-40, chunk_size=10):
+    """Remove trailing silence from a WAV file."""
+    audio = AudioSegment.from_wav(wav_path)
+
+    # Find where the sound ends by checking for silence
+    start_trim = len(audio)  # Start with the entire audio
+    for i in range(len(audio)-1, 0, -chunk_size):
+        chunk = audio[i - chunk_size:i]
+        if chunk.dBFS > silence_threshold:  # Check if the chunk is above the silence threshold
+            start_trim = i
+            break
+
+    trimmed_audio = audio[:start_trim]
+    trimmed_audio.export(f"{wav_path}", format="wav")
+    print(f"Trimmed audio saved as '{wav_path}'")
+
+# Example usage:
+remove_trailing_silence_from_wav("spectrum_sonification.wav")
+
+
+# test code
+n = 50
+# Simulated arrays based on more realistic patterns
+wavelength = np.linspace(400, 700, n)  # Wavelength from 400 nm to 700 nm (visible spectrum)
+
+# Background noise: Random fluctuation with a smooth trend
+bg_noise = np.random.normal(0.5, 0.1, n) + np.linspace(0.1, 0.8, n)
+
+# Emission lines: Sinusoidal peaks with random variability
+emission = np.zeros(n)
+emission[10:20] = np.sin(np.linspace(0, 2 * np.pi, 10)) ** 2  # Emission line in a section of the spectrum
+emission[30:40] = np.sin(np.linspace(0, 2 * np.pi, 10)) ** 2
+
+# Absorption lines: Cosine dips with a gradual change
+absorption = np.cos(np.linspace(0, 2 * np.pi, n)) ** 2
+
+# Cosmic rays: Sporadic spikes
+cosmic_rays = np.random.normal(0, 0.1, n)
+cosmic_rays[5] = 5  # Add a significant spike
+cosmic_rays[20] = 4  # Add another cosmic ray spike
+cosmic_rays[40] = 3  # Add another spike
+
+# Plot to visualize the arrays
+plt.figure(figsize=(10, 6))
+plt.plot(wavelength, bg_noise, label='Background Noise', color='gray', alpha=0.7)
+plt.plot(wavelength, emission, label='Emission Lines', color='blue', linewidth=2)
+plt.plot(wavelength, absorption, label='Absorption Lines', color='red', linewidth=2)
+plt.plot(wavelength, cosmic_rays, label='Cosmic Rays', color='green', marker='o', linestyle='--', alpha=0.8)
+plt.xlabel("Wavelength (nm)")
+plt.ylabel("Intensity")
+plt.title("Simulated Spectrum")
+plt.legend()
+plt.grid(True)
+plt.show()
+
+# Save the sonified file
+sonify_spectrum_to_wav(wavelength, bg_noise, emission, absorption, cosmic_rays, wav_path="sound7.wav")
+remove_trailing_silence_from_wav("sound7.wav")
