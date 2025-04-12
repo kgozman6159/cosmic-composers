@@ -2,14 +2,15 @@ import tkinter as tk
 from tkinter import ttk
 from PIL import Image, ImageTk
 from functools import partial
+from collections import deque
 
+# ========== Setup main window ==========
 root = tk.Tk()
 root.title("Cosmic Composers")
 root.geometry("800x800")  # Optional: set a window size
 root.configure(bg='black')
-image_paths = ["galaxy.png", "galaxy1.jpeg", "galaxy2.jpeg"]  # Use your real paths
-current_image_index = 0
-
+image_paths = ["galaxy1.jpeg", "galaxy.png", "galaxy2.jpeg", "galaxy3.png"]  # Use your real paths
+image_paths = deque(image_paths)  # Use deque for easy rotation
 
 style = ttk.Style(root)
 style.configure('TButton',
@@ -24,14 +25,19 @@ root.grid_rowconfigure(0, weight=1)
 root.grid_rowconfigure(1, weight=1)
 
 # ========== Left (big) section ==========
-left_frame = tk.Frame(root, bg='lightblue')
+left_frame = tk.Frame(root, bg='black', pady=20)
 left_frame.grid(row=0, column=0, rowspan=2, sticky="nsew")
 #setup carousel
-carousel_frame = tk.Frame(left_frame, bg='lightblue')
-carousel_frame.pack(side="top", fill="x", pady=(5, 0))
+carousel_frame = tk.Frame(left_frame, bg='black')
+carousel_frame.pack(side="top", fill="x")
 #setup coordinates label
+coord_frame = tk.Frame(left_frame, bg='black')
+coord_frame.pack(side="top", fill="x", padx=10, pady=5)
+coor_inner = tk.Frame(coord_frame, bg='black')
+coor_inner.pack(anchor="center")
+# Create a label to display coordinates
 coord_label = tk.Label(
-    left_frame,
+    coor_inner,
     text="Click on the image",
     bg='white',
     fg='black',
@@ -39,17 +45,17 @@ coord_label = tk.Label(
     relief='solid',
     bd=1
 )
-coord_label.pack(side="bottom", fill="x", padx=10, pady=5)
+coord_label.pack(side="top", fill="x", padx=10, pady=5)
 #setup image canvas
-imageCanvas = tk.Canvas(left_frame, bg='white')
+imageCanvas = tk.Canvas(left_frame, bg='black', highlightthickness=0)
 imageCanvas.pack(fill="both", expand=True)
 # Setup carousel
-carousel_frame = tk.Frame(left_frame, bg='lightblue')
+carousel_frame = tk.Frame(left_frame, bg='black')
 carousel_frame.pack(side="top", fill="x", pady=(5, 0))
 
 # Inner frame for centering
-carousel_inner = tk.Frame(carousel_frame, bg='lightblue')
-carousel_inner.pack(anchor="center", pady=5)
+carousel_inner = tk.Frame(carousel_frame, bg='black')
+carousel_inner.pack(anchor="center")
 
 # Create thumbnails
 thumbnails = []
@@ -57,30 +63,38 @@ for path in image_paths:
     thumb = Image.open(path).copy()
     thumb.thumbnail((60, 60)) 
     thumbnails.append(ImageTk.PhotoImage(thumb))
-
-left_btn = tk.Button(carousel_inner, text="<", width=2, command=lambda: update_image(current_image_index - 1))
+thumbnails = deque(thumbnails)  # always keep current image at the second position
+left_btn = tk.Button(carousel_inner, text="<", width=2, borderwidth=0, highlightthickness=0, command=lambda: update_image(1))
 left_btn.pack(side="left", padx=10)
 
-thumbnail_label = tk.Label(carousel_inner, image=thumbnails[0], bg='white', bd=2, relief="ridge")
-thumbnail_label.pack(side="left", padx=10)
+three_thumbnails = []
+for i, thumb in enumerate(thumbnails):
+    thumbnail_label = tk.Label(carousel_inner, image=thumbnails[i], bg='white', bd=2, relief="ridge")
+    thumbnail_label.pack(side="left", padx=10)
+    three_thumbnails.append(thumbnail_label)
+    if i==2: break
 
-right_btn = tk.Button(carousel_inner, text=">", width=2, command=lambda: update_image(current_image_index + 1))
+right_btn = tk.Button(carousel_inner, text=">", width=2, bd=0, command=lambda: update_image(-1))
 right_btn.pack(side="left", padx=10)
 
 # ===== Carousel functions =====
 def update_image(new_index):
-    global current_image_index, img, tk_img
-
-    current_image_index = new_index % len(image_paths)
-    img = Image.open(image_paths[current_image_index])
-    thumbnail_label.config(image=thumbnails[current_image_index])
+    global img, tk_img, three_thumbnails, image_paths, thumbnails
+    if new_index < 0:
+        thumbnails.rotate(-1)
+        image_paths.rotate(-1)
+    else:
+        thumbnails.rotate(1)
+        image_paths.rotate(1)
+    for i, thumb in enumerate(three_thumbnails):
+        thumb.config(image=thumbnails[i])
     resize_image(imageCanvas)  # Trigger redraw
 
-img = Image.open(image_paths[current_image_index])
+img = Image.open(image_paths[1])
 # === Resize and center image on canvas ===
 def resize_image(event=None):
-    global tk_img, img_offset, img_size
-
+    global tk_img, img_offset, img_size, img
+    img = Image.open(image_paths[1])
     if isinstance(event, tk.Event):  # Called from canvas resizing
         canvas = event.widget
     else:
@@ -117,7 +131,7 @@ def on_canvas_click(event):
         coord_label.config(text=f"Image coordinates: ({x_img}, {y_img})")
     else:
         coord_label.config(text="Click was outside the image.")
-# === Bind resize event ===
+# === Bind events ===
 imageCanvas.bind("<Configure>", resize_image)
 imageCanvas.bind("<Button-1>", on_canvas_click)
 
