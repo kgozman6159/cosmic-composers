@@ -1,0 +1,3 @@
+numpy
+pretty_midi
+midi2audio
