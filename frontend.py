@@ -23,9 +23,17 @@ root.grid_rowconfigure(1, weight=1)
 # ========== Left (big) section ==========
 left_frame = tk.Frame(root, bg='lightblue')
 left_frame.grid(row=0, column=0, rowspan=2, sticky="nsew")
-image_path = "2400.jpg"
-coord_label = tk.Label(root, text="Click on the image", bg='white')
-coord_label.grid(row=1, column=0, sticky="ew")
+image_path = "galaxy.png"
+coord_label = tk.Label(
+    left_frame,
+    text="Click on the image",
+    bg='white',
+    fg='black',
+    font=('Arial', 11),
+    relief='solid',
+    bd=1
+)
+coord_label.pack(side="bottom", fill="x", padx=10, pady=5)
 imageCanvas = tk.Canvas(left_frame, bg='white')
 imageCanvas.pack(fill="both", expand=True)
 img = Image.open(image_path)
@@ -50,9 +58,11 @@ def resize_image(event):
     imageCanvas.delete("all")
     imageCanvas.create_image(x_offset, y_offset, image=tk_img, anchor="nw")
     imageCanvas.image = tk_img
-    print('clicked')
 
 def on_canvas_click(event):
+    global coord_label
+    print('clicked')
+    print(f"Canvas clicked at ({event.x}, {event.y})")
     x_click, y_click = event.x, event.y
     x_offset, y_offset = img_offset
     img_width, img_height = img_size
@@ -65,7 +75,7 @@ def on_canvas_click(event):
         coord_label.config(text="Click was outside the image.")
 # === Bind resize event ===
 imageCanvas.bind("<Configure>", resize_image)
-
+imageCanvas.bind("<Button-1>", on_canvas_click)
 
 
 # ========== Right upper ==========
@@ -105,7 +115,6 @@ right_bottom.grid(row=1, column=1, sticky="nsew")
 
 
 # ========== Optional: sample widgets ==========
-tk.Label(left_frame, text="Left Frame").pack(padx=10, pady=10)
 tk.Label(right_bottom, text="Bottom Right").pack(padx=10, pady=10)
 
 root.mainloop()
