@@ -9,16 +9,16 @@ from tkmacosx import Button
 # ========== Setup main window ==========
 root = tk.Tk()
 root.title("Cosmic Composers")
-root.geometry("1000x800")  # Optional: set a window size
+root.geometry("1000x800") 
 IMG_WIDTH = 500
 IMG_HEIGHT = 500
 root.configure(bg='black')
-image_paths = ["galaxy1.jpeg", "galaxy.png", "galaxy2.jpeg", "galaxy3.png"]  # Use your real paths
+image_paths = ["galaxy1.jpeg", "galaxy.png", "galaxy2.jpeg", "galaxy3.png"] 
 image_paths = deque(image_paths)  # Use deque for easy rotation
 animation_running = False
 animation_step = 0
 animation_id = None
-animation_speed = 100  # Milliseconds between frames
+animation_speed = 100 
 
 style = ttk.Style(root)
 style.configure('TButton',
@@ -47,11 +47,9 @@ coord_label = tk.Label(
     text="Select a Spaxel!",
     bg='black',
     fg='white',
-    font=('Arial', 30, 'bold'),  # Increased font size and made it bold
-    # relief='groove',  # Changed relief style
-    # bd=2,
-    padx=10,  # Added horizontal padding
-    pady=5     # Added vertical padding
+    font=('Arial', 30, 'bold'), 
+    padx=10,
+    pady=5   
 )
 coord_label.pack(side="top", fill="x", padx=10, pady=5)
 #setup image canvas
@@ -88,6 +86,7 @@ right_btn.pack(side="left", padx=10)
 # ===== Carousel functions =====
 def update_image(new_index):
     global img, tk_img, three_thumbnails, image_paths, thumbnails
+    stop_animation()
     if new_index < 0:
         thumbnails.rotate(-1)
         image_paths.rotate(-1)
@@ -139,6 +138,8 @@ def on_canvas_click(event):
     if x_offset <= x_click <= x_offset + img_width and y_offset <= y_click <= y_offset + img_height: # modify this line to signal out of image click
         x_img = x_click - x_offset
         y_img = y_click - y_offset
+        x_img = int((x_img / 500) * 70)
+        y_img = int((y_img / 500) * 70)
         coord_label.config(text=f"Selected Spaxel: ({x_img}, {y_img})")
     else:
         coord_label.config(text="Click was outside the image.")
@@ -151,7 +152,6 @@ imageCanvas.bind("<Button-1>", on_canvas_click)
 # Create the right_top frame
 right_top = tk.Frame(root, width=40, bg='black')
 right_top.grid(row=0, column=1, sticky="nsew", pady=20, padx=20) 
-# Make the right_top frame expand with the window
 root.grid_rowconfigure(0, weight=1)
 root.grid_columnconfigure(1, weight=1)
 
@@ -184,6 +184,7 @@ def draw_cursor(type, event=None):
     global img, imageCanvas, play_type, animation_step
     resize_image()  # Ensure the image is resized before drawing
     animation_step = 0
+    stop_animation()
     # Get the image dimensions
     width, height = img.size
     draw = ImageDraw.Draw(img)
@@ -198,7 +199,7 @@ def draw_cursor(type, event=None):
         draw.line([line_start, line_end], fill=(255, 255, 255, 255), width=3)
     elif type == 2: #clock line
         line_start = (width//2, height//2)
-        line_end = (width, height)
+        line_end = (width, height//2)
         draw.line([line_start, line_end], fill=(255, 255, 255, 255), width=3)
     elif type == 3: #single point in center
         center_x = width // 2
@@ -316,12 +317,51 @@ def stop_animation():
         animation_id = None
 
 # ========== Right lower ==========
-right_bottom = tk.Frame(root, bg='black')
+right_bottom = tk.Frame(root, bg='black', height=200)
 right_bottom.grid(row=1, column=1, sticky="nsew")
 
+# Configure 3 rows since you're using rows 0, 1, and 2
+right_bottom.grid_rowconfigure(0, weight=0)  # Title
+right_bottom.grid_rowconfigure(1, weight=0)  # Slider
+right_bottom.grid_rowconfigure(2, weight=0)  # Button
 
+# Optional: Make columns expand horizontally
+right_bottom.grid_columnconfigure(0, weight=1)
+right_bottom.grid_columnconfigure(1, weight=1)
 
-# ========== Optional: sample widgets ==========
-tk.Label(right_bottom, text="Spaxel Spectrum", bg="black", fg="white").pack(padx=10, pady=10)
+# Title Label
+spaxel_spectrum = tk.Label(
+    right_bottom, text="Spaxel Spectrum",
+    bg='black', fg='white', font=('Arial', 12, 'bold')
+)
+spaxel_spectrum.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(10, 5))
+
+# Animation Speed Label
+speed_label = tk.Label(
+    right_bottom, text="Animation Speed:",
+    bg='black', fg='white', font=('Arial', 12)
+)
+speed_label.grid(row=1, column=0, sticky="e", padx=(10, 5), pady=5)
+
+# Speed Slider
+speed_slider = tk.Scale(
+    right_bottom, from_=2, to=100, orient=tk.HORIZONTAL,
+    bg='black', fg='white', command=lambda value: set_animation_speed(int(value))
+)
+speed_slider.set(animation_speed)
+speed_slider.grid(row=1, column=1, sticky="w", padx=(5, 10), pady=5)
+
+# Play Spaxel Sound Button
+spaxel_sound = Button(
+    right_bottom, text="Play Spaxel Sound",
+    bg='black', fg='white', borderless=1
+)
+spaxel_sound.grid(row=2, column=0, columnspan=2, sticky="ew", padx=10, pady=(5, 10))
+
+def set_animation_speed(value):
+    global animation_speed
+    animation_speed = value
+    print(f"Animation speed set to: {animation_speed}")
+
 
 root.mainloop()
