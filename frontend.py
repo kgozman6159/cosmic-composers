@@ -1,11 +1,15 @@
 import tkinter as tk
 from tkinter import ttk
 from PIL import Image, ImageTk
+from functools import partial
 
 root = tk.Tk()
 root.title("Cosmic Composers")
 root.geometry("800x800")  # Optional: set a window size
 root.configure(bg='black')
+image_paths = ["galaxy.png", "galaxy1.jpeg", "galaxy2.jpeg"]  # Use your real paths
+current_image_index = 0
+
 
 style = ttk.Style(root)
 style.configure('TButton',
@@ -13,7 +17,6 @@ style.configure('TButton',
                 background='black',
                 font=('Arial', 12),
                 relief='raised')
-
 # ========== Configure grid weights ==========
 root.grid_columnconfigure(0, weight=3)  # Left column (big)
 root.grid_columnconfigure(1, weight=1)  # Right column
@@ -23,7 +26,10 @@ root.grid_rowconfigure(1, weight=1)
 # ========== Left (big) section ==========
 left_frame = tk.Frame(root, bg='lightblue')
 left_frame.grid(row=0, column=0, rowspan=2, sticky="nsew")
-image_path = "galaxy.png"
+#setup carousel
+carousel_frame = tk.Frame(left_frame, bg='lightblue')
+carousel_frame.pack(side="top", fill="x", pady=(5, 0))
+#setup coordinates label
 coord_label = tk.Label(
     left_frame,
     text="Click on the image",
@@ -34,18 +40,57 @@ coord_label = tk.Label(
     bd=1
 )
 coord_label.pack(side="bottom", fill="x", padx=10, pady=5)
+#setup image canvas
 imageCanvas = tk.Canvas(left_frame, bg='white')
 imageCanvas.pack(fill="both", expand=True)
-img = Image.open(image_path)
+# Setup carousel
+carousel_frame = tk.Frame(left_frame, bg='lightblue')
+carousel_frame.pack(side="top", fill="x", pady=(5, 0))
+
+# Inner frame for centering
+carousel_inner = tk.Frame(carousel_frame, bg='lightblue')
+carousel_inner.pack(anchor="center", pady=5)
+
+# Create thumbnails
+thumbnails = []
+for path in image_paths:
+    thumb = Image.open(path).copy()
+    thumb.thumbnail((60, 60)) 
+    thumbnails.append(ImageTk.PhotoImage(thumb))
+
+left_btn = tk.Button(carousel_inner, text="<", width=2, command=lambda: update_image(current_image_index - 1))
+left_btn.pack(side="left", padx=10)
+
+thumbnail_label = tk.Label(carousel_inner, image=thumbnails[0], bg='white', bd=2, relief="ridge")
+thumbnail_label.pack(side="left", padx=10)
+
+right_btn = tk.Button(carousel_inner, text=">", width=2, command=lambda: update_image(current_image_index + 1))
+right_btn.pack(side="left", padx=10)
+
+# ===== Carousel functions =====
+def update_image(new_index):
+    global current_image_index, img, tk_img
+
+    current_image_index = new_index % len(image_paths)
+    img = Image.open(image_paths[current_image_index])
+    thumbnail_label.config(image=thumbnails[current_image_index])
+    resize_image(imageCanvas)  # Trigger redraw
+
+img = Image.open(image_paths[current_image_index])
 # === Resize and center image on canvas ===
-def resize_image(event):
+def resize_image(event=None):
     global tk_img, img_offset, img_size
 
-    canvas_width = event.width
-    canvas_height = event.height
+    if isinstance(event, tk.Event):  # Called from canvas resizing
+        canvas = event.widget
+    else:
+        canvas = imageCanvas  # Manual call
+
+    canvas_width = canvas.winfo_width()
+    canvas_height = canvas.winfo_height()
 
     img_copy = img.copy()
-    img_copy.thumbnail((canvas_width, canvas_height))  # Maintain aspect ratio
+    img_copy.thumbnail((canvas_width, canvas_height))
     tk_img = ImageTk.PhotoImage(img_copy)
 
     img_width, img_height = img_copy.size
@@ -55,19 +100,18 @@ def resize_image(event):
     img_offset = (x_offset, y_offset)
     img_size = (img_width, img_height)
 
-    imageCanvas.delete("all")
-    imageCanvas.create_image(x_offset, y_offset, image=tk_img, anchor="nw")
-    imageCanvas.image = tk_img
+    canvas.delete("all")
+    canvas.create_image(x_offset, y_offset, image=tk_img, anchor="nw")
+    canvas.image = tk_img
 
 def on_canvas_click(event):
     global coord_label
-    print('clicked')
     print(f"Canvas clicked at ({event.x}, {event.y})")
     x_click, y_click = event.x, event.y
     x_offset, y_offset = img_offset
     img_width, img_height = img_size
 
-    if x_offset <= x_click <= x_offset + img_width and y_offset <= y_click <= y_offset + img_height:
+    if x_offset <= x_click <= x_offset + img_width and y_offset <= y_click <= y_offset + img_height: # modify this line to signal out of image click
         x_img = x_click - x_offset
         y_img = y_click - y_offset
         coord_label.config(text=f"Image coordinates: ({x_img}, {y_img})")
