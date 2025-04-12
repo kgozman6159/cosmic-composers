@@ -14,21 +14,22 @@ IMG_WIDTH = 500
 IMG_HEIGHT = 500
 root.configure(bg='black')
 image_paths = ["galaxy1.jpeg", "galaxy.png", "galaxy2.jpeg", "galaxy3.png"] 
-image_paths = deque(image_paths)  # Use deque for easy rotation
+image_paths = deque(image_paths) 
 animation_running = False
 animation_step = 0
 animation_id = None
-animation_speed = 100 
+animation_speed = 100 #important speed parameter!
+selected_spaxel = None
 
 style = ttk.Style(root)
 style.configure('TButton',
-                foreground='black',  # Changed to white for visibility on black
+                foreground='black',
                 background='black',
                 font=('Arial', 12),
                 relief='raised')
 # ========== Configure grid weights ==========
-root.grid_columnconfigure(0, weight=3)  # Left column (big)
-root.grid_columnconfigure(1, weight=1)  # Right column
+root.grid_columnconfigure(0, weight=3)
+root.grid_columnconfigure(1, weight=1)
 root.grid_rowconfigure(0, weight=1)
 root.grid_rowconfigure(1, weight=1)
 
@@ -78,7 +79,7 @@ for i, thumb in enumerate(thumbnails):
     thumbnail_label = tk.Label(carousel_inner, image=thumbnails[i], bg='white', bd=2, relief="ridge")
     thumbnail_label.pack(side="left", padx=10)
     three_thumbnails.append(thumbnail_label)
-    if i==2: break #only three thumbnails
+    if i==2: break # only three thumbnails
 
 right_btn = tk.Button(carousel_inner, text=">", width=2, bd=0, command=lambda: update_image(-1))
 right_btn.pack(side="left", padx=10)
@@ -129,20 +130,43 @@ def resize_image(event=None):
 
 #get image coordinates on click
 def on_canvas_click(event):
-    global coord_label
-    print(f"Canvas clicked at ({event.x}, {event.y})")
-    x_click, y_click = event.x, event.y
-    x_offset, y_offset = img_offset
-    img_width, img_height = img_size
+    global img, imageCanvas, play_type, animation_step, coord_label, selected_spaxel
+    animation_step = 0
+    stop_animation()
 
-    if x_offset <= x_click <= x_offset + img_width and y_offset <= y_click <= y_offset + img_height: # modify this line to signal out of image click
+    canvas_width = imageCanvas.winfo_width()
+    canvas_height = imageCanvas.winfo_height()
+
+    # Ensure the image is resized before proceeding
+    resize_image()
+
+    img_width, img_height = img.size
+    x_offset = (canvas_width - img_width) // 2
+    y_offset = (canvas_height - img_height) // 2
+
+    x_click, y_click = event.x, event.y
+    if x_offset <= x_click <= x_offset + img_width and y_offset <= y_click <= y_offset + img_height:
         x_img = x_click - x_offset
         y_img = y_click - y_offset
-        x_img = int((x_img / 500) * 70)
-        y_img = int((y_img / 500) * 70)
-        coord_label.config(text=f"Selected Spaxel: ({x_img}, {y_img})")
+        # Draw on the image
+        draw = ImageDraw.Draw(img)
+        draw.ellipse(
+            [(x_img - 5, y_img - 5), (x_img + 5, y_img + 5)],
+            outline="white",fill="white", width=6
+        )
+        # Update coord label
+        grid_x = int((x_img / 500) * 70)
+        grid_y = int((y_img / 500) * 70)
+        selected_spaxel = (grid_x, grid_y)
+        coord_label.config(text=f"Selected Spaxel: ({grid_x}, {grid_y})")
     else:
         coord_label.config(text="Click was outside the image.")
+
+    # Display updated image on canvas
+    tk_img = ImageTk.PhotoImage(img)
+    imageCanvas.delete("all")
+    imageCanvas.create_image(x_offset, y_offset, image=tk_img, anchor="nw")
+    imageCanvas.image = tk_img  # Keep a reference!
 
 # === Bind events ===
 imageCanvas.bind("<Configure>", resize_image)
