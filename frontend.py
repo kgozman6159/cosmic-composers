@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import ttk
 from PIL import Image, ImageTk, ImageDraw
 from collections import deque
+import math
 
 # ========== Setup main window ==========
 root = tk.Tk()
@@ -12,6 +13,10 @@ IMG_HEIGHT = 500
 root.configure(bg='black')
 image_paths = ["galaxy1.jpeg", "galaxy.png", "galaxy2.jpeg", "galaxy3.png"]  # Use your real paths
 image_paths = deque(image_paths)  # Use deque for easy rotation
+animation_running = False
+animation_step = 0
+animation_id = None
+animation_speed = 100  # Milliseconds between frames
 
 style = ttk.Style(root)
 style.configure('TButton',
@@ -118,6 +123,7 @@ def resize_image(event=None):
     canvas.delete("all")
     canvas.create_image(x_offset, y_offset, image=tk_img, anchor="nw")
     canvas.image = tk_img
+    
 #get image coordinates on click
 def on_canvas_click(event):
     global coord_label
@@ -159,7 +165,7 @@ clockwise.grid(row=1, column=0, sticky="nsew")
 out = tk.Button(right_top,height=5, width=5,  text="Out",  command=lambda: draw_cursor(3))  # Apply the style
 out.grid(row=1, column=1, sticky="nsew")  
 
-play = ttk.Button(right_top, text="Play", style='TButton')  # Apply the style
+play = ttk.Button(right_top, text="Play", style='TButton', command=lambda: play_animation(4))  # Apply the style
 play.grid(row=2, column=0, columnspan=2, sticky="nsew")  # Span both columns
 # Configure rows and columns of right_top to resize properly
 right_top.grid_rowconfigure(0, weight=1)
@@ -208,7 +214,93 @@ def draw_cursor(type, event=None):
     y_offset = (canvas_height - img_height) // 2
     imageCanvas.create_image(x_offset, y_offset, image=tk_img, anchor="nw")
     imageCanvas.image = tk_img  # Keep a reference!
-    
+
+def update_canvas():
+    global img, imageCanvas, tk_img
+    try:
+        tk_img = ImageTk.PhotoImage(img)
+        imageCanvas.delete("all")
+        canvas_width = imageCanvas.winfo_width()
+        canvas_height = imageCanvas.winfo_height()
+        img_width, img_height = img.size
+        x_offset = (canvas_width - img_width) // 2
+        y_offset = (canvas_height - img_height) // 2
+        imageCanvas.create_image(x_offset, y_offset, image=tk_img, anchor="nw")
+        imageCanvas.image = tk_img
+    except Exception as e:
+        print(f"Error updating canvas: {e}")
+
+def play_animation(event=None):
+    global play_type, animation_running, animation_step, animation_id, img
+    if play_type is None or animation_running:
+        return
+
+    animation_running = True
+    animation_step = 0
+
+    def animate_frame():
+        global animation_step, animation_id, animation_running, img, image_paths
+        if not animation_running:
+            return
+
+        try:
+            # Open the original image for each frame
+            img = Image.open(image_paths[1]).convert("RGBA")
+            img = img.resize((IMG_WIDTH, IMG_HEIGHT))
+            width, height = img.size
+            draw = ImageDraw.Draw(img)
+
+            if play_type == 0:  # Moving horizontal line
+                y_position = (animation_step * 5) % height  # Move down and wrap
+                draw.line([(0, y_position), (width, y_position)], fill="white", width=3)
+            elif play_type == 1:  # Moving vertical line
+                x_position = (animation_step * 5) % width  # Move right and wrap
+                draw.line([(x_position, 0), (x_position, height)], fill="white", width=3)
+            elif play_type == 2:  # Rotating clock hand
+                center_x, center_y = width // 2, height // 2
+                angle = (animation_step * 10) % 360  # Rotate 10 degrees per frame
+                end_x = int(center_x + (width // 2 - 10) * math.cos(math.radians(angle)))
+                end_y = int(center_y + (height // 2 - 10) * math.sin(math.radians(angle)))
+                draw.line([(center_x, center_y), (end_x, end_y)], fill="white", width=3)
+            elif play_type == 3:  # Pulsating point
+                center_x, center_y = width // 2, height // 2
+                max_radius = width // 2  # Maximum possible radius to cover the image
+                # Make the radius grow and reset
+                radius = (animation_step * 10) % (max_radius * 2)
+                if radius > max_radius:
+                    # Shrinking phase: go from max_radius back to 0
+                    current_radius = max_radius * 2 - radius
+                else:
+                    current_radius = radius
+
+                # You might want to control the visibility with alpha (transparency)
+                alpha = int(255 * (1 - current_radius / max_radius))
+
+                # Draw the expanding/shrinking circle
+                draw.ellipse([(center_x - current_radius, center_y - current_radius),
+                              (center_x + current_radius, center_y + current_radius)],
+                             outline="white")
+
+            update_canvas()
+            animation_step += 1
+            animation_id = root.after(animation_speed, animate_frame)
+
+        except FileNotFoundError:
+            print(f"Error: Image not found during animation.")
+            stop_animation()
+        except Exception as e:
+            print(f"Error during animation frame: {e}")
+            stop_animation()
+
+    animate_frame()
+
+def stop_animation():
+    global animation_running, animation_id
+    animation_running = False
+    if animation_id:
+        root.after_cancel(animation_id)
+        animation_id = None
+
 # ========== Right lower ==========
 right_bottom = tk.Frame(root, bg='lightyellow')
 right_bottom.grid(row=1, column=1, sticky="nsew")
