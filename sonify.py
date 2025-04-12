@@ -7,12 +7,12 @@ from pydub import AudioSegment
 
 def sonify_spectrum_to_wav(
     wavelength,
-    bg_noise,
+    continuum,
     emission,
     absorption,
     cosmic_rays,
-    midi_path="spectrum_sonification.mid",
-    wav_path="spectrum_sonification.wav",
+    midi_path="spectrum.mid",
+    wav_path="spectrum.wav",
     soundfont_path="FluidR3_GM.sf2"
 ):
     # Normalize data
@@ -22,9 +22,9 @@ def sonify_spectrum_to_wav(
 
     # Initialize MIDI
     mid = MidiFile()
-    tempo = 375000  # microseconds per beat (120 BPM)
+    tempo = 50000  # microseconds per beat (120 BPM)
 
-    # Background noise track (pad instrument for ambient sound)
+    # Continuum track (pad instrument for ambient sound)
     track_bg = MidiTrack()
     mid.tracks.append(track_bg)
     track_bg.append(mido.MetaMessage('set_tempo', tempo=tempo))
@@ -48,7 +48,7 @@ def sonify_spectrum_to_wav(
     # Normalize values to MIDI pitch (21–108)
     pitches_emission = normalize(emission, 50, 70)  # Emission (higher notes)
     pitches_absorption = normalize(absorption, 28, 50)  # Absorption (lower notes)
-    velocities_bg = normalize(bg_noise, 40, 80)  # Background noise intensity
+    velocities_bg = normalize(continuum, 40, 80)  # Background noise intensity
     velocities_cosmic = normalize(cosmic_rays, 80, 127)  # Cosmic rays (higher velocity for impact)
 
     # Note duration for smoother sound (longer duration for overlapping sounds)
@@ -58,35 +58,33 @@ def sonify_spectrum_to_wav(
     pitch_bend_range = 8191  # Maximum allowed pitch bend
 
     for i in range(len(wavelength)):
-        time = i * 100  # space notes apart (still keeping some space for smoothness)
+        time = i * 100  # milliseconds between notes
 
-        # Background sustained note (longer duration for ambient sound)
-        track_bg.append(Message('note_on', note=50, velocity=velocities_bg[i], time=0, channel=0))
-        track_bg.append(Message('note_off', note=50, velocity=0, time=note_duration, channel=0))
+        # Background noise (if non-zero)
+        if continuum[i] != 0:
+            track_bg.append(Message('note_on', note=50, velocity=velocities_bg[i], time=0, channel=0))
+            track_bg.append(Message('note_off', note=50, velocity=0, time=note_duration, channel=0))
 
-        # Emission (longer notes and pitch bend applied)
-        track_em.append(Message('note_on', note=pitches_emission[i], velocity=70, time=0, channel=1))
-        track_em.append(Message('pitchwheel', pitch=pitch_bend_range, time=0, channel=1))  # Apply pitch bend for smooth transition
-        track_em.append(Message('note_off', note=pitches_emission[i], velocity=0, time=note_duration, channel=1))
+        # Emission line (if non-zero)
+        elif emission[i] != 0:
+            track_em.append(Message('note_on', note=pitches_emission[i], velocity=70, time=0, channel=1))
+            track_em.append(Message('pitchwheel', pitch=pitch_bend_range, time=0, channel=1))
+            track_em.append(Message('note_off', note=pitches_emission[i], velocity=0, time=note_duration, channel=1))
 
-        # Absorption (longer notes with some pitch bend)
-        track_ab.append(Message('note_on', note=pitches_absorption[i], velocity=100, time=0, channel=2))
-        track_ab.append(Message('pitchwheel', pitch=pitch_bend_range, time=0, channel=2))  # Apply pitch bend for smooth transition
-        track_ab.append(Message('note_off', note=pitches_absorption[i], velocity=0, time=note_duration, channel=2))
+        # Absorption line (if non-zero)
+        elif absorption[i] != 0:
+            track_ab.append(Message('note_on', note=pitches_absorption[i], velocity=100, time=0, channel=2))
+            track_ab.append(Message('pitchwheel', pitch=pitch_bend_range, time=0, channel=2))
+            track_ab.append(Message('note_off', note=pitches_absorption[i], velocity=0, time=note_duration, channel=2))
 
-        if cosmic_rays[i] > 0.5:  # Only trigger a cosmic ray when intensity exceeds a threshold
-            # Adjust velocity for cosmic ray (make it softer)
-            velocity = velocities_cosmic[i] // 2  # Halve the velocity for a softer sound
-            note = 85  # Pick a pitch that sounds bright (like a bell or music box)
-            delay = i * 100  # Gradually space out cosmic ray events
-
-            track_cosmic.append(Message('note_on', note=note, velocity=velocity, time=delay, channel=3))  # Delay based on index
+        # Cosmic ray spike (only if above threshold)
+        elif cosmic_rays[i] != 0:
+            velocity = velocities_cosmic[i] // 2
+            note = 85
+            delay = i * 100
+            track_cosmic.append(Message('note_on', note=note, velocity=velocity, time=delay, channel=3))
             track_cosmic.append(Message('note_off', note=note, velocity=0, time=note_duration, channel=3))
-        else:
-            # No cosmic ray spike: Add silence
-            track_cosmic.append(Message('note_on', note=0, velocity=0, time=0, channel=3))  # Silence
-            track_cosmic.append(Message('note_off', note=0, velocity=0, time=note_duration, channel=3))  # Silence duration
-   
+
     mid.save(midi_path)
 
     fs = FluidSynth(soundfont_path)
@@ -113,44 +111,44 @@ def remove_trailing_silence_from_wav(wav_path, silence_threshold=-40, chunk_size
     print(f"Trimmed audio saved as '{wav_path}'")
 
 # Example usage:
-remove_trailing_silence_from_wav("spectrum_sonification.wav")
+# remove_trailing_silence_from_wav("spectrum_sonification.wav")
 
 
-# test code
-n = 50
-# Simulated arrays based on more realistic patterns
-wavelength = np.linspace(400, 700, n)  # Wavelength from 400 nm to 700 nm (visible spectrum)
+# # test code
+# n = 50
+# # Simulated arrays based on more realistic patterns
+# wavelength = np.linspace(400, 700, n)  # Wavelength from 400 nm to 700 nm (visible spectrum)
 
-# Background noise: Random fluctuation with a smooth trend
-bg_noise = np.random.normal(0.5, 0.1, n) + np.linspace(0.1, 0.8, n)
+# # Background noise: Random fluctuation with a smooth trend
+# continuum = np.random.normal(0.5, 0.1, n) + np.linspace(0.1, 0.8, n)
 
-# Emission lines: Sinusoidal peaks with random variability
-emission = np.zeros(n)
-emission[10:20] = np.sin(np.linspace(0, 2 * np.pi, 10)) ** 2  # Emission line in a section of the spectrum
-emission[30:40] = np.sin(np.linspace(0, 2 * np.pi, 10)) ** 2
+# # Emission lines: Sinusoidal peaks with random variability
+# emission = np.zeros(n)
+# emission[10:20] = np.sin(np.linspace(0, 2 * np.pi, 10)) ** 2  # Emission line in a section of the spectrum
+# emission[30:40] = np.sin(np.linspace(0, 2 * np.pi, 10)) ** 2
 
-# Absorption lines: Cosine dips with a gradual change
-absorption = np.cos(np.linspace(0, 2 * np.pi, n)) ** 2
+# # Absorption lines: Cosine dips with a gradual change
+# absorption = np.cos(np.linspace(0, 2 * np.pi, n)) ** 2
 
-# Cosmic rays: Sporadic spikes
-cosmic_rays = np.random.normal(0, 0.1, n)
-cosmic_rays[5] = 5  # Add a significant spike
-cosmic_rays[20] = 4  # Add another cosmic ray spike
-cosmic_rays[40] = 3  # Add another spike
+# # Cosmic rays: Sporadic spikes
+# cosmic_rays = np.random.normal(0, 0.1, n)
+# cosmic_rays[5] = 5  # Add a significant spike
+# cosmic_rays[20] = 4  # Add another cosmic ray spike
+# cosmic_rays[40] = 3  # Add another spike
 
-# Plot to visualize the arrays
-plt.figure(figsize=(10, 6))
-plt.plot(wavelength, bg_noise, label='Background Noise', color='gray', alpha=0.7)
-plt.plot(wavelength, emission, label='Emission Lines', color='blue', linewidth=2)
-plt.plot(wavelength, absorption, label='Absorption Lines', color='red', linewidth=2)
-plt.plot(wavelength, cosmic_rays, label='Cosmic Rays', color='green', marker='o', linestyle='--', alpha=0.8)
-plt.xlabel("Wavelength (nm)")
-plt.ylabel("Intensity")
-plt.title("Simulated Spectrum")
-plt.legend()
-plt.grid(True)
-plt.show()
+# # Plot to visualize the arrays
+# plt.figure(figsize=(10, 6))
+# plt.plot(wavelength, continuum, label='Background Noise', color='gray', alpha=0.7)
+# plt.plot(wavelength, emission, label='Emission Lines', color='blue', linewidth=2)
+# plt.plot(wavelength, absorption, label='Absorption Lines', color='red', linewidth=2)
+# plt.plot(wavelength, cosmic_rays, label='Cosmic Rays', color='green', marker='o', linestyle='--', alpha=0.8)
+# plt.xlabel("Wavelength (nm)")
+# plt.ylabel("Intensity")
+# plt.title("Simulated Spectrum")
+# plt.legend()
+# plt.grid(True)
+# plt.show()
 
 # Save the sonified file
-sonify_spectrum_to_wav(wavelength, bg_noise, emission, absorption, cosmic_rays, wav_path="sound7.wav")
-remove_trailing_silence_from_wav("sound7.wav")
+# sonify_spectrum_to_wav(wavelength, continuum, emission, absorption, cosmic_rays, wav_path="sound7.wav")
+# remove_trailing_silence_from_wav("sound7.wav")
