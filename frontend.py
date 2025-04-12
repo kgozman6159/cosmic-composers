@@ -4,8 +4,8 @@ from PIL import Image, ImageTk, ImageDraw
 from collections import deque
 import math
 from tkmacosx import Button
-
-
+import playsound
+#pip3 install PyObjC
 # ========== Setup main window ==========
 root = tk.Tk()
 root.title("Cosmic Composers")
@@ -378,7 +378,7 @@ speed_slider.grid(row=1, column=1, sticky="w", padx=(5, 10), pady=5)
 # Play Spaxel Sound Button
 spaxel_sound = Button(
     right_bottom, text="Play Spaxel Sound",
-    bg='black', fg='white', borderless=1
+    bg='black', fg='white', borderless=1, command=lambda:play_wav()
 )
 spaxel_sound.grid(row=2, column=0, columnspan=2, sticky="ew", padx=10, pady=(5, 10))
 
@@ -387,5 +387,12 @@ def set_animation_speed(value):
     animation_speed = value
     print(f"Animation speed set to: {animation_speed}")
 
+def play_wav(event=None):
+    global selected_spaxel, spaxel_sound
+    if selected_spaxel is None:
+        print("No spaxel selected!")
+        return
+    playsound.playsound("test.wav")
+    
 
 root.mainloop()
