@@ -4,7 +4,12 @@ from PIL import Image, ImageTk, ImageDraw
 from collections import deque
 import math
 from tkmacosx import Button
-import playsound
+from sonify import sonify_spectrum_to_wav
+#remove_trailing_silence_from_wav
+from spaxel_to_wav import get_spaxel_spectra
+import os
+import sys
+import threading
 #pip3 install PyObjC
 
 # ========== Setup main window ==========
@@ -131,7 +136,7 @@ def resize_image(event=None):
 
 #get image coordinates on click
 def on_canvas_click(event):
-    global img, imageCanvas, play_type, animation_step, coord_label, selected_spaxel
+    global img, imageCanvas, play_type, animation_step, coord_label, selected_spaxel, image_paths
     animation_step = 0
     stop_animation()
 
@@ -160,6 +165,8 @@ def on_canvas_click(event):
         grid_y = int((y_img / 500) * 70)
         selected_spaxel = (grid_x, grid_y)
         coord_label.config(text=f"Selected Spaxel: ({grid_x}, {grid_y})")
+        # remove_trailing_silence_from_wav("sound.wav")
+        
     else:
         coord_label.config(text="Click was outside the image.")
 
@@ -349,6 +356,7 @@ right_bottom.grid(row=1, column=1, sticky="nsew")
 right_bottom.grid_rowconfigure(0, weight=0)  # Title
 right_bottom.grid_rowconfigure(1, weight=0)  # Slider
 right_bottom.grid_rowconfigure(2, weight=0)  # Button
+right_bottom.grid_rowconfigure(3, weight=1)  # Image - Give this row weight to expand
 
 # Optional: Make columns expand horizontally
 right_bottom.grid_columnconfigure(0, weight=1)
@@ -383,17 +391,50 @@ spaxel_sound = Button(
 )
 spaxel_sound.grid(row=2, column=0, columnspan=2, sticky="ew", padx=10, pady=(5, 10))
 
+# Create a canvas to display the spectrum image
+image_canvas = tk.Canvas(
+    right_bottom, bg='black'
+)
+image_canvas.grid(row=3, column=0, columnspan=2, sticky="nsew", padx=10, pady=10)
+
 def set_animation_speed(value):
     global animation_speed
     animation_speed = value
     print(f"Animation speed set to: {animation_speed}")
 
 def play_wav(event=None):
-    global selected_spaxel, spaxel_sound
+    global selected_spaxel, spaxel_sound, image_canvas
     if selected_spaxel is None:
         print("No spaxel selected!")
         return
-    playsound.playsound("test.wav")
     
+    filename = image_paths[1][:-4]
+
+    # will be a spectrum.png file in the same directory as the script
+    rest_wav, flux, continuum, emission, absorption, cosmic_rays = get_spaxel_spectra(filename, selected_spaxel[0], selected_spaxel[1])
+    
+    # spectrum_graph = ImageTk.PhotoImage(file="spectrum.png")
+    spectrum_graph = Image.open("spectrum.png").convert("RGBA")
+    # Get canvas dimensions
+    canvas_width = image_canvas.winfo_width()
+    canvas_height = image_canvas.winfo_height()
+
+    # Resize spectrum graph to fit canvas while maintaining aspect ratio
+    spectrum_graph.thumbnail((canvas_width, canvas_height))
+    # Create PhotoImage AND store a reference to it on the canvas itself
+    image_canvas.spectrum_tk_img = ImageTk.PhotoImage(spectrum_graph)
+    image_canvas.create_image(0, 0, image=image_canvas.spectrum_tk_img, anchor="nw")
+    image_canvas.image = image_canvas.spectrum_tk_img
+
+
+    sonify_spectrum_to_wav(rest_wav, continuum, emission, absorption, cosmic_rays, wav_path="sound.wav")
+
+    audio_thread = threading.Thread(target=play_sound)
+    audio_thread.daemon = True # Allows the program to exit even if thread is running
+    audio_thread.start() # Start the thread (doesn't block)
+    print("Audio playback started in background.")
+
+def play_sound():
+    os.system("afplay sound.wav")
 
 root.mainloop()

@@ -81,13 +81,16 @@ def get_spaxel_spectra(filename, x, y, plot=True):
         plt.ylabel('Flux (1e-17 FLAM)')
         plt.legend()
         plt.title(f'Spectrum at x={x}, y={y}')
-        plt.show()
+        # plt.show()
+
+        plt.savefig("spectrum.png", bbox_inches='tight', pad_inches=0)
 
     return rest_wav, flux, continuum, emission, absorption, cosmic_ray
 
 
-# Run the function
-rest_wav, flux, continuum, emission, absorption, cosmic_rays = get_spaxel_spectra("/Users/tabby/Downloads/cubes/manga-7443-12703-LOGCUBE.fits", 40, 40)
+# # Run the function
+if __name__ == "__main__":
+    rest_wav, flux, continuum, emission, absorption, cosmic_rays = get_spaxel_spectra("manga-7443-12703-LOGCUBE.fits", 40, 40)
 
-sonify_spectrum_to_wav(rest_wav, continuum, emission, absorption, cosmic_rays, wav_path="sound.wav")
-remove_trailing_silence_from_wav("sound.wav")
+    sonify_spectrum_to_wav(rest_wav, continuum, emission, absorption, cosmic_rays, wav_path="sound.wav")
+    remove_trailing_silence_from_wav("sound.wav")

@@ -3,7 +3,7 @@ from mido import Message, MidiFile, MidiTrack
 import numpy as np
 from midi2audio import FluidSynth
 import matplotlib.pyplot as plt
-from pydub import AudioSegment
+# from pydub import AudioSegment
 
 def sonify_spectrum_to_wav(
     wavelength,
@@ -96,6 +96,8 @@ def sonify_spectrum_to_wav(
 
 def remove_trailing_silence_from_wav(wav_path, silence_threshold=-40, chunk_size=10):
     """Remove trailing silence from a WAV file."""
+
+    return 
     audio = AudioSegment.from_wav(wav_path)
 
     # Find where the sound ends by checking for silence

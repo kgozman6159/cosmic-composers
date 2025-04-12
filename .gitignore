@@ -1,3 +1,15 @@
 FluidR3_GM.sf2
 
 env/
+
+*.fits
+*.png
+*.wav
+*.mid
+*.mp3
+*.m4a
+*.m4b
+
+.DS_Store
+.python-version
+__pycache__
