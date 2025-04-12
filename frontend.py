@@ -14,7 +14,7 @@ root.geometry("1000x800")
 IMG_WIDTH = 500
 IMG_HEIGHT = 500
 root.configure(bg='black')
-image_paths = ["galaxy1.jpeg", "galaxy.png", "galaxy2.jpeg", "galaxy3.png"] 
+image_paths = ["manga-7443-12703-LOGCUBE.fits.png", "manga-7443-12704-LOGCUBE.fits.png", "manga-8313-12701-LOGCUBE.fits.png", "manga-8979-9101-LOGCUBE.fits.png","manga-8979-12701-LOGCUBE.fits.png","manga-9872-6104-LOGCUBE.fits.png","manga-9872-9102-LOGCUBE.fits.png","manga-9872-12705-LOGCUBE.fits.png"] 
 image_paths = deque(image_paths) 
 animation_running = False
 animation_step = 0
