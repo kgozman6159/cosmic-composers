@@ -1,13 +1,14 @@
 import tkinter as tk
 from tkinter import ttk
-from PIL import Image, ImageTk
-from functools import partial
+from PIL import Image, ImageTk, ImageDraw
 from collections import deque
 
 # ========== Setup main window ==========
 root = tk.Tk()
 root.title("Cosmic Composers")
 root.geometry("800x800")  # Optional: set a window size
+IMG_WIDTH = 500
+IMG_HEIGHT = 500
 root.configure(bg='black')
 image_paths = ["galaxy1.jpeg", "galaxy.png", "galaxy2.jpeg", "galaxy3.png"]  # Use your real paths
 image_paths = deque(image_paths)  # Use deque for easy rotation
@@ -27,9 +28,7 @@ root.grid_rowconfigure(1, weight=1)
 # ========== Left (big) section ==========
 left_frame = tk.Frame(root, bg='black', pady=20)
 left_frame.grid(row=0, column=0, rowspan=2, sticky="nsew")
-#setup carousel
-carousel_frame = tk.Frame(left_frame, bg='black')
-carousel_frame.pack(side="top", fill="x")
+
 #setup coordinates label
 coord_frame = tk.Frame(left_frame, bg='black')
 coord_frame.pack(side="top", fill="x", padx=10, pady=5)
@@ -72,7 +71,7 @@ for i, thumb in enumerate(thumbnails):
     thumbnail_label = tk.Label(carousel_inner, image=thumbnails[i], bg='white', bd=2, relief="ridge")
     thumbnail_label.pack(side="left", padx=10)
     three_thumbnails.append(thumbnail_label)
-    if i==2: break
+    if i==2: break #only three thumbnails
 
 right_btn = tk.Button(carousel_inner, text=">", width=2, bd=0, command=lambda: update_image(-1))
 right_btn.pack(side="left", padx=10)
@@ -87,14 +86,16 @@ def update_image(new_index):
         thumbnails.rotate(1)
         image_paths.rotate(1)
     for i, thumb in enumerate(three_thumbnails):
-        thumb.config(image=thumbnails[i])
-    resize_image(imageCanvas)  # Trigger redraw
+        thumb.config(image=thumbnails[i]) #update the thumbnail images
+    resize_image(imageCanvas)  # update the main image
 
-img = Image.open(image_paths[1])
+img = Image.open(image_paths[1]).convert("RGBA")
+img = img.resize((IMG_WIDTH, IMG_HEIGHT))
 # === Resize and center image on canvas ===
 def resize_image(event=None):
     global tk_img, img_offset, img_size, img
     img = Image.open(image_paths[1])
+    img = img.resize((IMG_WIDTH, IMG_HEIGHT))
     if isinstance(event, tk.Event):  # Called from canvas resizing
         canvas = event.widget
     else:
@@ -117,7 +118,7 @@ def resize_image(event=None):
     canvas.delete("all")
     canvas.create_image(x_offset, y_offset, image=tk_img, anchor="nw")
     canvas.image = tk_img
-
+#get image coordinates on click
 def on_canvas_click(event):
     global coord_label
     print(f"Canvas clicked at ({event.x}, {event.y})")
@@ -131,32 +132,31 @@ def on_canvas_click(event):
         coord_label.config(text=f"Image coordinates: ({x_img}, {y_img})")
     else:
         coord_label.config(text="Click was outside the image.")
+
 # === Bind events ===
 imageCanvas.bind("<Configure>", resize_image)
 imageCanvas.bind("<Button-1>", on_canvas_click)
-
 
 # ========== Right upper ==========
 # Create the right_top frame
 right_top = ttk.Frame(root)  # Use ttk.Frame for themed styling
 right_top.grid(row=0, column=1, sticky="nsew")
-
 # Make the right_top frame expand with the window
 root.grid_rowconfigure(0, weight=1)
 root.grid_columnconfigure(1, weight=1)
 
 # Create the buttons and place them in the grid within right_top
-button1 = ttk.Button(right_top, text="Button 1", style='TButton')  # Apply the style
-button1.grid(row=0, column=0, sticky="nsew")  # Remove padx, pady from here
+right = ttk.Button(right_top, text="Right", style='TButton', command=lambda: draw_cursor(1))  # Apply the style
+right.grid(row=0, column=0, sticky="nsew") 
 
-button2 = ttk.Button(right_top, text="Button 2", style='TButton')  # Apply the style
-button2.grid(row=0, column=1, sticky="nsew")  # Remove padx, pady from here
+down = ttk.Button(right_top, text="Down", style='TButton', command=lambda: draw_cursor(0))  # Apply the style
+down.grid(row=0, column=1, sticky="nsew")  
 
-button3 = ttk.Button(right_top, text="Button 3", style='TButton')  # Apply the style
-button3.grid(row=1, column=0, sticky="nsew")  # Remove padx, pady from here
+clockwise = ttk.Button(right_top, text="Clockwise", style='TButton')  # Apply the style
+clockwise.grid(row=1, column=0, sticky="nsew") 
 
-button4 = ttk.Button(right_top, text="Button 4", style='TButton')  # Apply the style
-button4.grid(row=1, column=1, sticky="nsew")  # Remove padx, pady from here
+out = ttk.Button(right_top, text="Out", style='TButton')  # Apply the style
+out.grid(row=1, column=1, sticky="nsew")  
 
 # Configure rows and columns of right_top to resize properly
 right_top.grid_rowconfigure(0, weight=1)
@@ -165,7 +165,32 @@ right_top.grid_columnconfigure(0, weight=1)
 right_top.grid_columnconfigure(1, weight=1)
 
 
-
+# ========== Button Functions ==========
+def draw_cursor(type, event=None):
+    global img, imageCanvas
+    # Get the image dimensions
+    width, height = img.size
+    draw = ImageDraw.Draw(img)
+    if type == 0:  # Horizontal line
+        line_start = (0, 0)
+        line_end = (width, 0)
+        draw.line([line_start, line_end], fill=(255, 255, 255, 255), width=3)
+    elif type == 1:  # Vertical line
+        line_start = (0, 0)
+        line_end = (0, height)
+        draw.line([line_start, line_end], fill=(255, 255, 255, 255), width=3)
+    # Convert the modified PIL image to Tkinter PhotoImage
+    tk_img = ImageTk.PhotoImage(img)
+    # Update the image on the canvas
+    imageCanvas.delete("all")
+    canvas_width = imageCanvas.winfo_width()
+    canvas_height = imageCanvas.winfo_height()
+    img_width, img_height = img.size
+    x_offset = (canvas_width - img_width) // 2
+    y_offset = (canvas_height - img_height) // 2
+    imageCanvas.create_image(x_offset, y_offset, image=tk_img, anchor="nw")
+    imageCanvas.image = tk_img  # Keep a reference!
+    
 # ========== Right lower ==========
 right_bottom = tk.Frame(root, bg='lightyellow')
 right_bottom.grid(row=1, column=1, sticky="nsew")
