@@ -27,8 +27,8 @@ def compress(cube, x_coord: int, y_coord: int) -> np.ndarray:
         'h_epsilon': (5000, 5040),
         'h_zeta': (5870, 5910),
         'h_eta': (6640, 6680),
-        'zero_three': (4850, 5020), # Often referred to as [O III]
-        's_two': (6700, 6750)      # Often referred to as [S II]
+        'zero_three': (4850, 5020), 
+        's_two': (6700, 6750)   
     }
 
     try:
@@ -59,11 +59,11 @@ def compress(cube, x_coord: int, y_coord: int) -> np.ndarray:
             spectrum_slice_at_coord = flux_cube_array[idx1:idx2, y_coord, x_coord]
             
             # Sum the linear flux values within this slice
-            flux_sum_in_range = np.sum(spectrum_slice_at_coord)
+            flux_sum_in_range = np.nansum(spectrum_slice_at_coord)
             
             # Handle potential NaN results if any flux values were NaN
             if np.isnan(flux_sum_in_range):
-                flux_sum_in_range = 0.0 # Or choose another appropriate fill value
+                flux_sum_in_range = 1 # Or choose another appropriate fill value
 
         compressed_flux.append(flux_sum_in_range)
 
