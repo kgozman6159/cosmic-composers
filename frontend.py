@@ -3,11 +3,13 @@ from tkinter import ttk
 from PIL import Image, ImageTk, ImageDraw
 from collections import deque
 import math
+from tkmacosx import Button
+
 
 # ========== Setup main window ==========
 root = tk.Tk()
 root.title("Cosmic Composers")
-root.geometry("800x800")  # Optional: set a window size
+root.geometry("1000x800")  # Optional: set a window size
 IMG_WIDTH = 500
 IMG_HEIGHT = 500
 root.configure(bg='black')
@@ -42,12 +44,14 @@ coor_inner.pack(anchor="center")
 # Create a label to display coordinates
 coord_label = tk.Label(
     coor_inner,
-    text="Click on the image",
-    bg='white',
-    fg='black',
-    font=('Arial', 11),
-    relief='solid',
-    bd=1
+    text="Select a Spaxel!",
+    bg='black',
+    fg='white',
+    font=('Arial', 30, 'bold'),  # Increased font size and made it bold
+    # relief='groove',  # Changed relief style
+    # bd=2,
+    padx=10,  # Added horizontal padding
+    pady=5     # Added vertical padding
 )
 coord_label.pack(side="top", fill="x", padx=10, pady=5)
 #setup image canvas
@@ -123,7 +127,7 @@ def resize_image(event=None):
     canvas.delete("all")
     canvas.create_image(x_offset, y_offset, image=tk_img, anchor="nw")
     canvas.image = tk_img
-    
+
 #get image coordinates on click
 def on_canvas_click(event):
     global coord_label
@@ -135,7 +139,7 @@ def on_canvas_click(event):
     if x_offset <= x_click <= x_offset + img_width and y_offset <= y_click <= y_offset + img_height: # modify this line to signal out of image click
         x_img = x_click - x_offset
         y_img = y_click - y_offset
-        coord_label.config(text=f"Image coordinates: ({x_img}, {y_img})")
+        coord_label.config(text=f"Selected Spaxel: ({x_img}, {y_img})")
     else:
         coord_label.config(text="Click was outside the image.")
 
@@ -145,27 +149,28 @@ imageCanvas.bind("<Button-1>", on_canvas_click)
 
 # ========== Right upper ==========
 # Create the right_top frame
-right_top = ttk.Frame(root)  # Use ttk.Frame for themed styling
-right_top.grid(row=0, column=1, sticky="nsew")
+right_top = tk.Frame(root, width=40, bg='black')
+right_top.grid(row=0, column=1, sticky="nsew", pady=20, padx=20) 
 # Make the right_top frame expand with the window
 root.grid_rowconfigure(0, weight=1)
 root.grid_columnconfigure(1, weight=1)
 
 play_type = None
 # Create the buttons and place them in the grid within right_top
-right = tk.Button(right_top, text="Right", height=5, width=5, command=lambda: draw_cursor(1))  # Apply the style
-right.grid(row=0, column=0, sticky="nsew") 
+right = Button(right_top, text="Right", height=5, width=8, bg="black", 
+               borderless=1, fg="white", command=lambda: draw_cursor(1))  # Apply the style
+right.grid(row=0, column=0, sticky="nsew", padx=5, pady=5) 
 
-down = tk.Button(right_top, text="Down", height=5, width=5,  command=lambda: draw_cursor(0))  # Apply the style
-down.grid(row=0, column=1, sticky="nsew")  
+down = Button(right_top, text="Down", height=5, width=8,  bg="black", borderless=1, fg="white", command=lambda: draw_cursor(0))  # Apply the style
+down.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)  
 
-clockwise = tk.Button(right_top,height=5, width=5,  text="Clockwise",  command=lambda: draw_cursor(2))  # Apply the style
-clockwise.grid(row=1, column=0, sticky="nsew") 
+clockwise = Button(right_top,height=5, width=8,  bg="black", borderless=1, fg="white", text="Clockwise",  command=lambda: draw_cursor(2))  # Apply the style
+clockwise.grid(row=1, column=0, sticky="nsew", padx=5, pady=5) 
 
-out = tk.Button(right_top,height=5, width=5,  text="Out",  command=lambda: draw_cursor(3))  # Apply the style
-out.grid(row=1, column=1, sticky="nsew")  
+out = Button(right_top,height=5, width=8,  bg="black", borderless=1, fg="white", text="Out",  command=lambda: draw_cursor(3))  # Apply the style
+out.grid(row=1, column=1, sticky="nsew", padx=5, pady=5)  
 
-play = ttk.Button(right_top, text="Play", style='TButton', command=lambda: play_animation(4))  # Apply the style
+play = Button(right_top, text="Play", bg= "black", fg="white", borderless=1, command=lambda: play_animation(4))  # Apply the style
 play.grid(row=2, column=0, columnspan=2, sticky="nsew")  # Span both columns
 # Configure rows and columns of right_top to resize properly
 right_top.grid_rowconfigure(0, weight=1)
@@ -174,10 +179,11 @@ right_top.grid_columnconfigure(0, weight=1)
 right_top.grid_columnconfigure(1, weight=1)
 
 
-# ========== Button Functions ==========
+# ========== Animation Functions ==========
 def draw_cursor(type, event=None):
-    global img, imageCanvas, play_type
+    global img, imageCanvas, play_type, animation_step
     resize_image()  # Ensure the image is resized before drawing
+    animation_step = 0
     # Get the image dimensions
     width, height = img.size
     draw = ImageDraw.Draw(img)
@@ -197,7 +203,7 @@ def draw_cursor(type, event=None):
     elif type == 3: #single point in center
         center_x = width // 2
         center_y = height // 2
-        radius = width//2
+        radius = 2
         x1 = center_x - radius
         y1 = center_y - radius
         x2 = center_x + radius
@@ -251,14 +257,23 @@ def play_animation(event=None):
             draw = ImageDraw.Draw(img)
 
             if play_type == 0:  # Moving horizontal line
-                y_position = (animation_step * 5) % height  # Move down and wrap
+                y_position = (animation_step * 5)  # Move down 
+                if y_position > height: 
+                    stop_animation()
+                    return
                 draw.line([(0, y_position), (width, y_position)], fill="white", width=3)
             elif play_type == 1:  # Moving vertical line
-                x_position = (animation_step * 5) % width  # Move right and wrap
+                x_position = (animation_step * 5) # Move right 
+                if x_position > width:
+                    stop_animation()
+                    return
                 draw.line([(x_position, 0), (x_position, height)], fill="white", width=3)
             elif play_type == 2:  # Rotating clock hand
                 center_x, center_y = width // 2, height // 2
-                angle = (animation_step * 10) % 360  # Rotate 10 degrees per frame
+                angle = (animation_step * 10) # Rotate 10 degrees per frame
+                if angle >360:
+                    stop_animation()
+                    return
                 end_x = int(center_x + (width // 2 - 10) * math.cos(math.radians(angle)))
                 end_y = int(center_y + (height // 2 - 10) * math.sin(math.radians(angle)))
                 draw.line([(center_x, center_y), (end_x, end_y)], fill="white", width=3)
@@ -268,8 +283,7 @@ def play_animation(event=None):
                 # Make the radius grow and reset
                 radius = (animation_step * 10) % (max_radius * 2)
                 if radius > max_radius:
-                    # Shrinking phase: go from max_radius back to 0
-                    current_radius = max_radius * 2 - radius
+                    stop_animation()
                 else:
                     current_radius = radius
 
@@ -302,12 +316,12 @@ def stop_animation():
         animation_id = None
 
 # ========== Right lower ==========
-right_bottom = tk.Frame(root, bg='lightyellow')
+right_bottom = tk.Frame(root, bg='black')
 right_bottom.grid(row=1, column=1, sticky="nsew")
 
 
 
 # ========== Optional: sample widgets ==========
-tk.Label(right_bottom, text="Bottom Right").pack(padx=10, pady=10)
+tk.Label(right_bottom, text="Spaxel Spectrum", bg="black", fg="white").pack(padx=10, pady=10)
 
 root.mainloop()
