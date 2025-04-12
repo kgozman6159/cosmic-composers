@@ -145,19 +145,22 @@ right_top.grid(row=0, column=1, sticky="nsew")
 root.grid_rowconfigure(0, weight=1)
 root.grid_columnconfigure(1, weight=1)
 
+play_type = None
 # Create the buttons and place them in the grid within right_top
-right = ttk.Button(right_top, text="Right", style='TButton', command=lambda: draw_cursor(1))  # Apply the style
+right = tk.Button(right_top, text="Right", height=5, width=5, command=lambda: draw_cursor(1))  # Apply the style
 right.grid(row=0, column=0, sticky="nsew") 
 
-down = ttk.Button(right_top, text="Down", style='TButton', command=lambda: draw_cursor(0))  # Apply the style
+down = tk.Button(right_top, text="Down", height=5, width=5,  command=lambda: draw_cursor(0))  # Apply the style
 down.grid(row=0, column=1, sticky="nsew")  
 
-clockwise = ttk.Button(right_top, text="Clockwise", style='TButton')  # Apply the style
+clockwise = tk.Button(right_top,height=5, width=5,  text="Clockwise",  command=lambda: draw_cursor(2))  # Apply the style
 clockwise.grid(row=1, column=0, sticky="nsew") 
 
-out = ttk.Button(right_top, text="Out", style='TButton')  # Apply the style
+out = tk.Button(right_top,height=5, width=5,  text="Out",  command=lambda: draw_cursor(3))  # Apply the style
 out.grid(row=1, column=1, sticky="nsew")  
 
+play = ttk.Button(right_top, text="Play", style='TButton')  # Apply the style
+play.grid(row=2, column=0, columnspan=2, sticky="nsew")  # Span both columns
 # Configure rows and columns of right_top to resize properly
 right_top.grid_rowconfigure(0, weight=1)
 right_top.grid_rowconfigure(1, weight=1)
@@ -167,10 +170,12 @@ right_top.grid_columnconfigure(1, weight=1)
 
 # ========== Button Functions ==========
 def draw_cursor(type, event=None):
-    global img, imageCanvas
+    global img, imageCanvas, play_type
+    resize_image()  # Ensure the image is resized before drawing
     # Get the image dimensions
     width, height = img.size
     draw = ImageDraw.Draw(img)
+    play_type = type
     if type == 0:  # Horizontal line
         line_start = (0, 0)
         line_end = (width, 0)
@@ -179,6 +184,19 @@ def draw_cursor(type, event=None):
         line_start = (0, 0)
         line_end = (0, height)
         draw.line([line_start, line_end], fill=(255, 255, 255, 255), width=3)
+    elif type == 2: #clock line
+        line_start = (width//2, height//2)
+        line_end = (width, height)
+        draw.line([line_start, line_end], fill=(255, 255, 255, 255), width=3)
+    elif type == 3: #single point in center
+        center_x = width // 2
+        center_y = height // 2
+        radius = width//2
+        x1 = center_x - radius
+        y1 = center_y - radius
+        x2 = center_x + radius
+        y2 = center_y + radius
+        draw.ellipse([(x1, y1), (x2, y2)], outline="white", width=3)
     # Convert the modified PIL image to Tkinter PhotoImage
     tk_img = ImageTk.PhotoImage(img)
     # Update the image on the canvas
